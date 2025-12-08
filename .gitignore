@@ -1,0 +1,12 @@
+# Ignore FAISS index
+index/astro.index
+
+# Generic binary files
+*.index
+*.bin
+*.faiss
+*.npy
+
+# Python cache
+__pycache__/
+*.pyc
