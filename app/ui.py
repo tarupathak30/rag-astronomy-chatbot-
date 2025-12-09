@@ -6,12 +6,27 @@ from .llm import GroqLLM
 rag = RAGPipeline("data")
 llm = GroqLLM()
 
+
 def chat(query: str):
-    # Retrieve relevant chunks
+    # Try structured numeric comparison first
+    structured = rag.structured(query)
+
+    if structured is not None and "planet" in structured and structured["planet"]:
+        p = structured["planet"]
+        name = p.get("planet_name", "Unknown Planet")
+        val = structured.get("value", "N/A")
+        attr = structured.get("attribute", "Unknown Attribute")
+
+        return f"✅ Structured Answer → **{name}** has **{attr.replace('_',' ')}** = **{val}**"
+
+    # Fallback: retrieve relevant chunks from RAG
     retrieved = rag.retrieve(query, top_k=5)
+    if not retrieved:
+        return "⚠️ Sorry, no relevant information found in the context."
+
     context = "\n\n".join([r["text"] for r in retrieved])
 
-    # Prepare prompt
+    # Prepare prompt for LLM
     prompt = f"""
 You are answering a question about exoplanets.
 Use ONLY the following context:
@@ -21,8 +36,15 @@ Use ONLY the following context:
 Question: {query}
 Answer in one short paragraph.
 """
+
     # Call LLM
-    return llm.generate(prompt)
+    try:
+        answer = llm.generate(prompt)
+    except Exception as e:
+        answer = f"⚠️ LLM call failed: {str(e)}"
+
+    return answer
+
 
 
 iface = gr.Interface(

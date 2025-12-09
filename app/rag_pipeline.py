@@ -1,5 +1,5 @@
 
-
+from .logic.exoplanets_comparator import Comparator
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -22,6 +22,8 @@ class RAGPipeline:
                 self.corpus_texts.append(c)
                 self.corpus_metadata.append(obj)
 
+        self.cmp = Comparator(self.data)
+
         # Initialize embeddings
         self.model = SentenceTransformer(embedding_model)
         self.embeddings = np.array(self.model.encode(self.corpus_texts, show_progress_bar=True))
@@ -31,6 +33,15 @@ class RAGPipeline:
         self.index = faiss.IndexFlatL2(dim)
         self.index.add(self.embeddings)
         print(f"✅ Index built with {len(self.corpus_texts)} chunks, dim={dim}")
+
+    def structured(self, query: str):
+        """Run numeric/structured lookup."""
+        res = self.cmp.lookup(query)
+        if res: 
+            print("bro, there is a response for you ")
+            print(res)
+            return res
+    
 
     def retrieve(self, query: str, top_k=5):
         if not query:
