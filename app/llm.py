@@ -11,7 +11,7 @@ class GroqLLM:
             model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=max_tokens,
-            temperature=0.7,
+            temperature=0.9,
             top_p=0.9,
             frequency_penalty=0,
             presence_penalty=0

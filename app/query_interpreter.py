@@ -1,42 +1,66 @@
 import re
 from typing import List, Dict, Any, Optional
 
+NUM_WORDS = {
+        "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+        "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+        "eleven": 11, "twelve": 12, "fifteen": 15, "twenty": 20
+    }
+
 class QueryInterpreter:
     def __init__(self, data: List[Dict[str, Any]]):
         self.data = data  # your list of planet dicts
     
+    
+
     def parse_intent(self, q: str) -> Dict[str, Any]:
         q = q.lower()
         intent = {}
-        
-        # Detect attribute to analyze
-        for attr in ["radius", "mass", "period", "discovery", "year"]:
-            if attr in q:
-                intent["attribute"] = attr
-                break
-        
-        # Detect aggregation
-        if any(word in q for word in ["largest", "max", "biggest", "maximum"]):
+
+        # 1. attribute detection
+        ATTRS = ["radius", "mass", "orbital_period", "distance", "year"]
+        intent["attribute"] = next((attr for attr in ATTRS if attr in q), None)
+
+        # default attribute only if none found
+        if not intent["attribute"]:
+            intent["attribute"] = "radius"
+
+        # 2. aggregation detection
+        if re.search(r"\b(top|largest|max|biggest|maximum)\b", q):
             intent["agg"] = "max"
-        elif any(word in q for word in ["smallest", "min", "tiny", "minimum"]):
+        elif re.search(r"\b(smallest|min|minimum|tiny)\b", q):
             intent["agg"] = "min"
-        elif "average" in q or "mean" in q:
+        elif re.search(r"\b(average|mean)\b", q):
             intent["agg"] = "avg"
-        elif "count" in q or "number" in q:
+        elif "count" in q:
             intent["agg"] = "count"
         else:
-            intent["agg"] = "list"  # default fallback
-        
-        # Extract filter for year or mass if present
-        year_match = re.search(r"(?:after|since|from)\s*(\d{4})", q)
-        if year_match:
-            intent["year_filter"] = int(year_match.group(1))
-        
-        mass_match = re.search(r"mass\s*>\s*(\d+)", q)
-        if mass_match:
-            intent["mass_filter"] = float(mass_match.group(1))
-        
+            intent["agg"] = "list"
+
+        # 3. plural + limit detection
+        num = re.search(r"(top|largest|biggest|min|max)\s*(\d+)", q)
+        if num:
+            intent["plural"] = True
+            intent["limit"] = int(num.group(2))
+        else:
+            intent["plural"] = bool(re.search(r"\b(top|largest|biggest|list|show)\b", q))
+
+        # fallback limit if plural with no number:
+        if intent["plural"] and "limit" not in intent:
+            intent["limit"] = 10
+
+        # 4. filters
+        if year := re.search(r"(?:after|since|from)\s*(\d{4})", q):
+            intent["year_filter"] = int(year.group(1))
+
+        if mass_gt := re.search(r"mass\s*>\s*([\d.]+)", q):
+            intent["mass_gt"] = float(mass_gt.group(1))
+
+        if mass_lt := re.search(r"mass\s*<\s*([\d.]+)", q):
+            intent["mass_lt"] = float(mass_lt.group(1))
+
         return intent
+
     
     def apply_filters(self, intent: Dict[str, Any]) -> List[Dict[str, Any]]:
         filtered = self.data

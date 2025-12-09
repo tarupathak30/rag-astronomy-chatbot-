@@ -7,6 +7,8 @@ import json
 from .utils import planet_to_text
 from .llm import GroqLLM
 from app.query_interpreter import QueryInterpreter
+from app.planet_db import PlanetDB
+
 
 class AstroRAG:
     def __init__(self, index_path="index/astro.index", meta_path="index/metadata.pkl"):
@@ -22,7 +24,7 @@ class AstroRAG:
 
         if self.planet_data is None:
             raise ValueError("Must provide planet_data to QueryInterpreter")
-        
+        self.planet_db = PlanetDB(self.planet_data)
         self.query_interpreter = QueryInterpreter(self.planet_data)
 
         if os.path.exists(index_path):
@@ -128,35 +130,75 @@ class AstroRAG:
         self.index = index
         self.metadata = {"docs": docs, "ids": ids}
 
+    def search(self, query, top_k=10):
+        if self.index is None:
+            raise ValueError("FAISS index not loaded. Build index first using .build_index()")
 
+        if self.metadata is None or "docs" not in self.metadata:
+            raise ValueError("Metadata missing or corrupted. Rebuild index.")
+
+        # Encode the query
+        q_vec = self.model.encode([query])
+
+        # Search FAISS
+        distances, indices = self.index.search(np.array(q_vec), top_k)
+
+        results = []
+        for idx in indices[0]:
+            if idx < len(self.metadata["docs"]):
+                results.append({
+                    "chunk": self.metadata["docs"][idx],
+                    "source": self.metadata["ids"][idx]
+                })
+
+        return results
+
+    def rank(self, intent):
+        df = self.df.copy()
+
+        attr = intent.get("attribute", "radius")
+
+        # apply filters
+        if "year_filter" in intent:
+            df = df[df["discovery_year"] >= intent["year_filter"]]
+
+        if "mass_gt" in intent:
+            df = df[df["mass"] > intent["mass_gt"]]
+
+        if "mass_lt" in intent:
+            df = df[df["mass"] < intent["mass_lt"]]
+
+        # sort
+        if intent.get("agg") == "max":
+            df = df.sort_values(attr, ascending=False)
+        elif intent.get("agg") == "min":
+            df = df.sort_values(attr, ascending=True)
+
+        # limit
+        limit = intent.get("limit", 10)
+        return df.head(limit).to_dict(orient="records")
 
     def query(self, user_query):
         parsed = self.query_interpreter.parse_intent(user_query)
+        print("Parsed intent:", parsed)
 
-        # Structured query route (no embeddings)
-        if "order_by" in parsed or any(k in parsed for k in ["radius", "mass", "orbital_period", "distance"]):
-            print(" Structured DB mode (no RAG fallback)")
-            df = self.planet_db.df.copy()
+        if parsed.get("agg") == "max" and parsed.get("plural"):
+            planets = self.planet_db.rank(parsed)  # your pandas output list of dicts
+            # convert ranked planet dicts to chunks expected by summarize_chunks
+            chunks = [{"chunk": f"{p['planet_name']} — Radius: {p.get(parsed['attribute'] + '_earth_radii', 'N/A')} Earth radii"} for p in planets[:parsed["limit"]]]
+            return self.summarize_chunks(chunks, user_query)
 
-            # Apply constraints if present
-            for key, val in parsed.items():
-                if key in ["radius", "mass", "orbital_period", "distance"] and isinstance(val, tuple):
-                    df = df[(df[key] >= val[0]) & (df[key] <= val[1])]
+        if parsed.get("agg") == "max":
+            return self.query_interpreter.answer(user_query)
 
-            # Sort
-            if "order_by" in parsed:
-                df = df.sort_values(parsed["order_by"], ascending=not parsed.get("desc", True))
+        if parsed.get("agg") in ["min", "avg", "count"] or parsed.get("attribute"):
+            return self.query_interpreter.answer(user_query)
 
-            # Limit
-            limit = parsed.get("limit", 10)
-            df = df.head(limit)
+        chunks = self.search(user_query)
+        return self.summarize_chunks(chunks, user_query)
 
-            return df.to_dict(orient="records")  # structured data, not summarization
 
-        # Default → embeddings
-        print("📎 Fallback to RAG search mode")
-        results = self.search(user_query)
-        return self.llm.summarize(results)
+
 
 
     def summarize_chunks(self, chunks, q):
@@ -171,16 +213,18 @@ class AstroRAG:
         {combined}
 
         Rules:
-        - If the question uses terms like "largest", "longest", "highest", "biggest", "maximum":
-            → extract ALL candidates mentioned in context
-            → compare them by the correct attribute (radius for largest planet)
-            → output ONLY the top ranking planet
-        - Do not ignore planets if context lists multiple.
-        - No summaries unless specifically asked.
-        - Answer in one sentence.
+            - If the user requests "top", "largest", "biggest", "max", etc:
+                → return ALL matching planets up to limit (default 10 unless specified)
+            - Format as a ranked list, not a single summary.
+            - Do NOT collapse into one planet.
+            - Do NOT summarize into prose. Show list format.
+
+            Format:
+            1. Planet Name — Radius X
+            2. Planet Name — Radius Y
         """
 
-        return self.llm.generate(prompt, max_tokens=400)
+        return self.llm.generate(prompt, max_tokens=700)
 
     def answer_directly(self, chunks, q):
         combined_text = "\n\n".join([c["chunk"] for c in chunks])
@@ -200,12 +244,14 @@ class AstroRAG:
         Give only the fact asked.
 
         Rules:
-        - If the question uses terms like "largest", "longest", "highest", "biggest", "maximum":
-            → extract ALL candidates mentioned in context
-            → compare them by the correct attribute (radius for largest planet)
-            → output ONLY the top ranking planet
-        - Do not ignore planets if context lists multiple.
-        - No summaries unless specifically asked.
-        - Answer in one sentence.
+            - If the user requests "top", "largest", "biggest", "max", etc:
+                → return ALL matching planets up to limit (default 10 unless specified)
+            - Format as a ranked list, not a single summary.
+            - Do NOT collapse into one planet.
+            - Do NOT summarize into prose. Show list format.
+
+            Format:
+            1. Planet Name — Radius X
+            2. Planet Name — Radius Y
         """
-        return self.llm.generate(prompt, max_tokens=500)
+        return self.llm.generate(prompt, max_tokens=700)
