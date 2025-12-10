@@ -47,13 +47,34 @@ class RAGPipeline:
         if not query:
             return []
 
+        # 1. Force-inject any planets explicitly named
+        forced = self.force_load_planets(query)
+
+        # 2. Semantic retrieval (as before)
         q_emb = np.array(self.model.encode([query]))
         D, I = self.index.search(q_emb, top_k)
 
-        results = []
+        semantic = []
         for idx in I[0]:
-            results.append({
+            semantic.append({
                 "text": self.corpus_texts[idx],
                 "metadata": self.corpus_metadata[idx]
             })
-        return results
+
+        # 3. Merge → forced first (ensures planet availability)
+        return forced + semantic
+
+
+    def force_load_planets(self, query: str):
+        """Hard-match planet names and inject their full JSON rows."""
+        found = []
+
+        for obj in self.data:
+            name = obj.get("planet_name", "")
+            if name.lower() in query.lower():
+                found.append({
+                    "text": planet_text(obj),   # full cleaned text
+                    "metadata": obj
+                })
+
+        return found
