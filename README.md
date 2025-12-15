@@ -1,145 +1,153 @@
 🌌 Astronomy RAG Chatbot
 
-Domain-Specific Retrieval-Augmented Generation System
+Grounded Question-Answering over Exoplanet Data using Retrieval-Augmented Generation
 
-A lightweight but production-minded Retrieval-Augmented Generation (RAG) chatbot designed to answer factual astronomy questions using curated exoplanet datasets, rather than relying on hallucination-prone generic LLM knowledge.
+General-purpose LLMs hallucinate when asked precise scientific questions.
+This project tackles that failure mode by grounding responses in a curated exoplanet knowledge base using a Retrieval-Augmented Generation (RAG) pipeline.
 
-🚀 Overview
+🚀 Motivation
 
-Large Language Models are fluent but unreliable when queried on specialized scientific domains.
-This project addresses that gap by building a RAG pipeline that grounds responses in real exoplanet data.
+Astronomy queries demand precision, not plausibility.
 
-The chatbot retrieves relevant information from a vector index built over structured astronomy datasets and uses it to generate accurate, context-aware answers.
+Instead of relying on an LLM’s parametric memory, this system:
 
-🧠 System Architecture
+retrieves factual context from real exoplanet datasets
 
-High-level flow:
+injects that context into the generation step
 
+produces answers constrained by retrieved evidence
+
+The result: answers that are explainable, verifiable, and domain-grounded.
+
+🧠 Architecture Overview
 User Query
    ↓
-Query Embedding
+Dense Query Embedding
    ↓
-Vector Similarity Search (FAISS)
+FAISS Vector Similarity Search
    ↓
-Relevant Context Retrieval
+Top-K Context Retrieval
    ↓
-LLM Answer Generation
+LLM Generation (Context-Injected)
    ↓
-Final Grounded Response
+Grounded Final Answer
 
-🧩 Key Features
 
-🔍 Semantic Retrieval using dense embeddings
+This clean separation between retrieval and generation was intentional to reduce hallucinations and improve traceability.
 
-📚 Domain-specific knowledge base (exoplanet data)
+🧩 Core Capabilities
 
-🧠 Context-grounded generation to reduce hallucinations
+Semantic retrieval using sentence-level embeddings
 
-⚡ Fast inference with pre-built vector index
+Domain-specific knowledge base built from exoplanet datasets
 
-🖥️ Interactive UI using Gradio
+Hallucination reduction via strict context injection
+
+Low-latency inference with a precomputed vector index
+
+Interactive Gradio UI for exploratory querying
 
 🗂️ Dataset
 
-Source: Curated exoplanet datasets (JSON format)
+Format: JSON
 
-Content includes:
+Domain: Exoplanets
+
+Attributes include:
 
 Planet name
 
-Physical characteristics (mass, radius, orbital parameters)
+Physical properties (mass, radius, orbital parameters)
 
 Discovery metadata
 
-Stored under: data/exoplanets/
+Location: data/exoplanets/
 
-🏗️ Project Structure
+🏗️ Repository Structure
 .
-├── app/                    # Chatbot application logic
-├── data/exoplanets/        # Raw exoplanet datasets
+├── app/                    # Application & query pipeline
+├── data/exoplanets/        # Raw domain data
 ├── index/                  # FAISS vector index
-├── exoplanets_GITHUB.ipynb # Data exploration & indexing notebook
-├── requirements.txt        # Dependencies
-└── README.md               # Project documentation
+├── exoplanets_GITHUB.ipynb # Data prep & indexing workflow
+├── requirements.txt
+└── README.md
 
 🛠️ Tech Stack
 
 Python
 
-Sentence Transformers (Embeddings)
+Sentence Transformers (embeddings)
 
-FAISS (Vector similarity search)
+FAISS (vector search)
 
-LLM (API-based) for response generation
+LLM (API-based)
 
-Gradio for UI
+Gradio (UI)
 
-📌 Indexing Strategy
+📌 Indexing Design
 
-Data is chunked into semantically meaningful text units
+Data is chunked into semantically meaningful units
 
-Embeddings are generated once and stored locally
+Embeddings are generated once and persisted locally
 
-Index is rebuilt when:
+Index rebuilds are triggered when:
 
-Dataset changes
+dataset content changes
 
-New files are added
+new files are added
 
-(Current version uses full index rebuild for reliability; incremental updates are a planned improvement.)
+Incremental indexing is intentionally deferred to prioritize correctness and reproducibility in this MVP.
 
-▶️ Running the Project
+▶️ Running the Application
 pip install -r requirements.txt
 python app/ui.py
 
 
-The Gradio interface will launch locally in your browser.
+Launches a local Gradio interface for interactive querying.
 
 🧪 Example Queries
 
-“Which exoplanet has the largest radius?”
+Which exoplanet has the largest known radius?
 
-“Tell me about WASP-17 b”
+Tell me about WASP-17 b
 
-“Compare hot Jupiters discovered by Kepler”
+Compare hot Jupiters discovered by Kepler
 
-Responses are generated only from retrieved dataset context.
+All responses are generated strictly from retrieved dataset context.
 
-⚠️ Limitations
+⚠️ Known Limitations
 
-Dataset coverage is currently limited to exoplanets
+Coverage limited to exoplanet data
 
-No real-time astronomy API integration yet
+No live astronomy API integration
 
-Evaluation is qualitative (manual inspection)
+Evaluation is currently qualitative
 
-These are intentional trade-offs for a focused MVP.
+These trade-offs were chosen to keep the system focused and interpretable.
 
-🔮 Future Work
+🔮 Planned Extensions
 
-Expand dataset to stars, galaxies, and missions
+Expand knowledge base to stars, galaxies, and missions
 
-Add hybrid retrieval (BM25 + dense)
+Hybrid retrieval (BM25 + dense)
 
-Implement incremental index updates
+Incremental index updates
 
-Introduce automated evaluation metrics
+Automated evaluation benchmarks
 
-Deploy as a public web service
+Public deployment
 
-📎 Why This Project Matters
+📎 Why This Project Exists
 
 This project demonstrates:
 
-Practical understanding of RAG systems
+System-level understanding of RAG pipelines
 
-Clear separation of retrieval vs generation
+Explicit control over hallucination failure modes
 
-Focus on grounded, reliable AI outputs
+Separation of concerns between retrieval and generation
 
-Ability to move beyond toy LLM demos into system design
+A shift from “LLM demo” to grounded AI system design
 
-👤 Author tarupathak30
-
+👤 Author
 Taru Pathak
-GitHub: tarupathak30
