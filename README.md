@@ -59,18 +59,7 @@ Planet name
 
 Physical properties (mass, radius, orbital parameters)
 
-Discovery metadata
 
-Location: data/exoplanets/
-
-🏗️ Repository Structure
-.
-├── app/                    # Application & query pipeline
-├── data/exoplanets/        # Raw domain data
-├── index/                  # FAISS vector index
-├── exoplanets_GITHUB.ipynb # Data prep & indexing workflow
-├── requirements.txt
-└── README.md
 
 🛠️ Tech Stack
 
